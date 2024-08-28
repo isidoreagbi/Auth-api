@@ -51,6 +51,7 @@ class AuthRepository implements AuthInterface
 
         return false;
     }
+    
     public function login(array $data)
     {
         $user = User::where('email', $data['email'])->first();
