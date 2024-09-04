@@ -44,14 +44,14 @@ class AuthRepository implements AuthInterface
             $user->update(['is_confirmed' => true]);
 
             $otp_code->delete();
-            
+
             $user->token = $user->createToken($user->id)->plainTextToken;
             return $user;
-        } 
+        }
 
         return false;
     }
-    
+
     public function login(array $data)
     {
         $user = User::where('email', $data['email'])->first();
@@ -59,6 +59,13 @@ class AuthRepository implements AuthInterface
         if (!$user)
             return false;
 
-        return Hash::check($data['password'], $user->password);
+        if (!Hash::check($data['password'], $user->password)) {
+            return false;
+        }
+        $user->tokens()->delete();
+        
+        $user->token = $user->createToken($user->id)->plainTextToken;
+
+        return $user;
     }
 }

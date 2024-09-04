@@ -6,6 +6,7 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Interfaces\AuthInterface;
+use App\Models\User;
 use App\Responses\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,15 +15,17 @@ use PhpParser\Node\Stmt\TryCatch;
 class AuthController extends Controller
 {
     private AuthInterface $authInterface;
-    public function __construct(AuthInterface $authInterface){
+    public function __construct(AuthInterface $authInterface)
+    {
         $this->authInterface = $authInterface;
     }
 
-    public function register(RegisterRequest $registerRequest){
+    public function register(RegisterRequest $registerRequest)
+    {
         $data = [
-            'name' => $registerRequest->name, 
+            'name' => $registerRequest->name,
             'email' => $registerRequest->email,
-            'password' => $registerRequest->password, 
+            'password' => $registerRequest->password,
         ];
 
         DB::beginTransaction();
@@ -33,11 +36,12 @@ class AuthController extends Controller
 
             return ApiResponse::sendResponse(true, [new UserResource($user)], 'Opération effectuée.', 201);
         } catch (\Throwable $th) {
-            
-            return ApiResponse::rollback($th);       
-            }
+
+            return ApiResponse::rollback($th);
+        }
     }
-    public function login(LoginRequest $loginRequest){
+    public function login(LoginRequest $loginRequest)
+    {
         $data = [
             'email' => $loginRequest->email,
             'password' => $loginRequest->password,
@@ -49,16 +53,72 @@ class AuthController extends Controller
 
             DB::commit();
 
+            if (!$user){
+                return ApiResponse::sendResponse(
+                    $user,
+                    [],
+                    'Identifiant invalide.',
+                    200
+                );
+            }
+
             return ApiResponse::sendResponse(
                 $user,
                 [],
-                'Opération effectuée.', 
-                $user ? 200 : 401
+                'Opération effectuée.',
+                200
             );
-
         } catch (\Throwable $th) {
-            
-            return ApiResponse::rollback($th);       
+
+            return ApiResponse::rollback($th);
+        }
+    }
+
+    public function checkOtpCode(Request $request)
+    {
+        $data = [
+            'email' => $request->email,
+            'code' => $request->code,
+        ];
+
+        DB::beginTransaction();
+        try {
+            $user = $this->authInterface->checkOtpCode($data);
+
+            DB::commit();
+
+            if (!$user) {
+
+                return ApiResponse::sendResponse(
+                    false,
+                    [],
+                    'Code de Confirmation Invalide.',
+                    200
+                );
             }
+
+
+            return ApiResponse::sendResponse(
+                true,
+                [new UserResource($user)],
+                'Opérations effectué.',
+                200
+            );
+        } catch (\Throwable $th) {
+
+            return ApiResponse::rollback($th);
+        }
+    }
+    public function logout() {
+
+        $user = User::find(auth()->user()->getAuthIdentifier());
+        $user->tokens()->delete();
+
+        return ApiResponse::sendResponse(
+            true,
+            [],
+            'Utilisateurs déconnecté.',
+            200
+        );
     }
 }
